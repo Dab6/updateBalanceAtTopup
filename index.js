@@ -12,7 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Cache to store the last known points of each customer
-const customerPointCache = {};
+let customerPointCache = {};
 
 // Function to fetch customers from Loyverse
 async function fetchCustomers() {
@@ -22,7 +22,6 @@ async function fetchCustomers() {
                 'Authorization': `Bearer ${LOYVERSE_API_TOKEN}`
             }
         });
-
         // Ensure the response data contains customers
         if (response.data && response.data.customers) {
             return response.data.customers;
@@ -39,20 +38,19 @@ async function fetchCustomers() {
 // Function to check for point balance changes
 async function checkForPointUpdates() {
     const customers = await fetchCustomers();
-
     for (const customer of customers) {
-        const { id, display_name, loyalty_points } = customer;
+        const { id, name, total_points } = customer;
 
         // Check if this customer is in our cache
         const previousPoints = customerPointCache[id] || 0;
 
-        // Detect change in loyalty points
-        if (loyalty_points !== previousPoints) {
-            console.log(`Points update detected for ${display_name}: ${previousPoints} -> ${loyalty_points}`);
+        // Detect change in total_points
+        if (total_points !== previousPoints) {
+            console.log(`Points update detected for ${name}: ${previousPoints} -> ${total_points}`);
             
             // Update the cache with the new points
-            customerPointCache[id] = loyalty_points;
-
+            customerPointCache[id] = total_points;
+            
             // Trigger the webhook on Make.com
             await triggerMakeWebhook(customer);
         }
@@ -64,10 +62,13 @@ async function triggerMakeWebhook(customer) {
     try {
         await axios.post(WEBHOOK_URL, {
             customer_id: customer.id,
-            display_name: customer.display_name,
-            new_points: customer.loyalty_points
+            name: customer.name,
+            new_points: customer.total_points,
+            email: customer.email,
+            phone_number: customer.phone_number,
+            total_spent: customer.total_spent
         });
-        console.log(`Webhook triggered for ${customer.display_name} with new points: ${customer.loyalty_points}`);
+        console.log(`Webhook triggered for ${customer.name} with new points: ${customer.total_points}`);
     } catch (error) {
         console.error('Error triggering webhook:', error.message);
     }
