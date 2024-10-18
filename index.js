@@ -42,20 +42,22 @@ async function checkForPointUpdates() {
     for (const customer of customers) {
         const { id, name, total_points } = customer;
 
-        // Check if this customer is in our cache
-        const previousPoints = customerPointCache[id] || 0;
-
         // Initialize the cache during the first run without triggering the webhook
         if (isFirstRun) {
             customerPointCache[id] = total_points;
-        } else if (total_points !== previousPoints) {
-            console.log(`Points update detected for ${name}: ${previousPoints} -> ${total_points}`);
+        } else {
+            const previousPoints = customerPointCache[id] || 0;
+            
+            // Detect change in total_points
+            if (total_points !== previousPoints) {
+                console.log(`Points update detected for ${name}: ${previousPoints} -> ${total_points}`);
 
-            // Update the cache with the new points
-            customerPointCache[id] = total_points;
+                // Update the cache with the new points
+                customerPointCache[id] = total_points;
 
-            // Trigger the webhook for this customer
-            await triggerMakeWebhook(customer);
+                // Trigger the webhook for this customer
+                await triggerMakeWebhook(customer);
+            }
         }
     }
 
