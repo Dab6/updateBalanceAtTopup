@@ -40,7 +40,7 @@ async function checkForPointUpdates() {
     const customers = await fetchCustomers();
 
     for (const customer of customers) {
-        const { id, name, total_points } = customer;
+        const { id, name, total_points, customer_code } = customer;
 
         // Initialize the cache during the first run without triggering the webhook
         if (isFirstRun) {
@@ -77,7 +77,8 @@ async function triggerMakeWebhook(customer) {
             new_points: customer.total_points,
             email: customer.email,
             phone_number: customer.phone_number,
-            total_spent: customer.total_spent
+            total_spent: customer.total_spent,
+            customer_code: customer.customer_code // Added customer_code
         });
         console.log(`Webhook triggered for ${customer.name} with new points: ${customer.total_points}`);
     } catch (error) {
