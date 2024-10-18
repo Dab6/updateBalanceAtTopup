@@ -1,6 +1,5 @@
 const express = require('express'); // Import Express framework
 const axios = require('axios'); // Import Axios for making HTTP requests
-const cron = require('node-cron'); // Import Node-Cron for scheduling tasks
 require('dotenv').config(); // Import and configure dotenv to access environment variables
 
 // Environment variables
@@ -13,6 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 // Cache to store the last known points of each customer
 let customerPointCache = {};
+let isFirstRun = true; // Flag to indicate the first run
 
 // Function to fetch customers from Loyverse
 async function fetchCustomers() {
@@ -38,22 +38,31 @@ async function fetchCustomers() {
 // Function to check for point balance changes
 async function checkForPointUpdates() {
     const customers = await fetchCustomers();
+
     for (const customer of customers) {
         const { id, name, total_points } = customer;
 
         // Check if this customer is in our cache
         const previousPoints = customerPointCache[id] || 0;
 
-        // Detect change in total_points
-        if (total_points !== previousPoints) {
+        // Initialize the cache during the first run without triggering the webhook
+        if (isFirstRun) {
+            customerPointCache[id] = total_points;
+        } else if (total_points !== previousPoints) {
             console.log(`Points update detected for ${name}: ${previousPoints} -> ${total_points}`);
-            
+
             // Update the cache with the new points
             customerPointCache[id] = total_points;
-            
-            // Trigger the webhook on Make.com
+
+            // Trigger the webhook for this customer
             await triggerMakeWebhook(customer);
         }
+    }
+
+    // After the first run, set the flag to false
+    if (isFirstRun) {
+        console.log('Cache initialized on first run.');
+        isFirstRun = false;
     }
 }
 
@@ -74,11 +83,14 @@ async function triggerMakeWebhook(customer) {
     }
 }
 
-// Schedule the point update check to run every minute using node-cron
-cron.schedule('* * * * *', checkForPointUpdates);
+// Endpoint to manually check for point updates
+app.get('/check-updates', async (req, res) => {
+    await checkForPointUpdates();
+    res.send('Checked for customer point updates.');
+});
 
 // Start the Express server
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    console.log('Checking for customer point updates every minute...');
+    console.log('Manual update check endpoint available at /check-updates');
 });
